@@ -18,17 +18,19 @@ import os
 import time
 #import plotly.plotly as py
 import matplotlib
-matplotlib.use('Agg')
+# matplotlib.use('Agg')
 matplotlib.rcParams['figure.figsize']=[15,12]
 import matplotlib.pyplot as plt
 
 #%pylab inline
 #pylab.rcParams['figure.figsize'] = (20, 6)
 # import cufflinks as cf
+#SatDataDir='../SATDATA/10_101_0_42_sky-*' # uncomment this line for use on ice.boisestate.edu
+SatDataDir='SatFrom/10_101_0_42_sky-*'
 print('Loading all Winter 2017-18 radar data...\n')
 DFall=pd.DataFrame({'date': pd.Timestamp('Wed Sept 1 00:00:00 2017'),'depth': pd.Series(0)}) # initialize
 DFall=DFall.set_index('date') # set date as index
-for filename in glob.glob('../SATDATA/10_101_0_42_sky-*'): # loop over all pit files
+for filename in glob.glob(SatDataDir): # loop over all pit files
     #print(filename)
     fdate=pd.Timestamp(time.ctime(os.path.getmtime(filename)))
     #print(fdate)
@@ -49,8 +51,13 @@ print('loading Snotel data...\n')
 params = StationHourlyDataIO(
     station='312:ID:SNTL',
     start_date='2017-10-01',
-    end_date='2017-12-31',
+    end_date='2018-1-31',
     )
+tstart=pd.Timestamp(2017,12,1,12)
+tstart=tstart.to_pydatetime()
+tend=pd.Timestamp(2018,1,31,12)
+tend=tend.to_pydatetime()
+
 
 Pnames=[str(param.element_name) for param in params] # list of parameter names
 Pnames.append('DateTime')
@@ -73,36 +80,38 @@ print('open new figure with subplots')
 fig, axs = plt.subplots(2, 2, sharex=True, sharey=True)
 plt.subplot(221)
 t=df.index.to_pydatetime()
+Ix9=(t>tstart) & (t<tend)
 Tair=(df['AIR TEMPERATURE OBSERVED']-32.0)*5/9.0
 T0=np.zeros(np.size(df.index))
-lines=plt.plot(t,T0,t,Tair)
+lines=plt.plot(t[Ix9],T0[Ix9],t[Ix9],Tair[Ix9])
 plt.setp(lines, color='black',linewidth=2.0)
-plt.fill_between(t,T0,Tair,where=Tair>0,color='red',alpha='0.5')
-plt.fill_between(t,T0,Tair,where=Tair<0,color='blue',alpha='0.5')
+plt.fill_between(t[Ix9],T0[Ix9],Tair[Ix9],where=Tair[Ix9]>0,color='red',alpha='0.5')
+plt.fill_between(t[Ix9],T0[Ix9],Tair[Ix9],where=Tair[Ix9]<0,color='blue',alpha='0.5')
 plt.ylabel('air temp [deg C]', fontsize=16)
 print('plot the second subplot')
 plt.subplot(223)
 # grab Snotel data and convert
 SWEsnotel=df['SNOW WATER EQUIVALENT']*2.54
 Ix2=df['PRECIPITATION ACCUMULATION']*2.54<30
-Psnotel=df['PRECIPITATION ACCUMULATION']*2.54-7.25
+Psnotel=df['PRECIPITATION ACCUMULATION']*2.54-14.25
 Dsnotel=df['SNOW DEPTH']*2.54
 # grab radar data with good values
 t2=DFall.index.to_pydatetime()
+Ix10=(t2>tstart) & (t2<tend)
 print(DFall)
 SWEradar=DFall['SWE1']*100-4.39
 # define some lines
 d0=np.ones(np.size(t))*8.5*2.54*0.25
 dL=np.ones(np.size(t))*-7
-Ix3=t<pd.Timestamp(2017,10,31)
-plt.fill_between(t[Ix3],dL[Ix3],d0[Ix3], color='grey', alpha='0.5')
-tRain=pd.Timestamp(2017,11,21,12)
-tRain2=pd.Timestamp(2017,11,28,12)
-tRain=tRain.to_pydatetime()
-tRain2=tRain2.to_pydatetime()
-Ix4=(t>tRain) & (t<tRain2)
-plt.fill_between(t,-7,32,where=Ix4, color='grey',alpha='0.5')
-lines=plt.plot(t,d0,t,Dsnotel*0.25,t,SWEsnotel,t,Psnotel,t2,SWEradar)
+# Ix3=t<pd.Timestamp(2017,10,31)
+# plt.fill_between(t[Ix3],dL[Ix3],d0[Ix3], color='grey', alpha='0.5')
+#tRain=pd.Timestamp(2017,11,21,12)
+#tRain2=pd.Timestamp(2017,11,28,12)
+#tRain=tRain.to_pydatetime()
+#tRain2=tRain2.to_pydatetime()
+#Ix4=(t>tRain) & (t<tRain2)
+#plt.fill_between(t,-7,32,where=Ix4, color='grey',alpha='0.5')
+lines=plt.plot(t[Ix9],d0[Ix9],t[Ix9],Dsnotel[Ix9]*0.25,t[Ix9],SWEsnotel[Ix9],t[Ix9],Psnotel[Ix9],t2[Ix10],SWEradar[Ix10])
 print('change the line widths')
 plt.setp(lines, linewidth=8.0)
 plt.setp(lines[0], color='black')
@@ -118,7 +127,7 @@ plt.ylabel('water equivalent [cm]', fontsize=16)
 A=plt.gca()
 z=A.get_xlim()
 plt.xlim((z[0],z[1]))
-plt.ylim((-7,30))
+plt.ylim((12,27))
 #plt.show
 #fig.savefig("BannerSWEdar.png",bbox_inches='tight')
 
@@ -126,7 +135,7 @@ plt.ylim((-7,30))
 # now plot scatter plot of radar vs SnowTEL SWE and precip during valid periods
 print('now interpolate radar to SNOTEL time intervals')
 from scipy.interpolate import Rbf
-tS=pd.Timestamp(2017,10,31)
+tS=pd.Timestamp(2017,11,1)
 tS=tS.to_pydatetime()
 tS2=pd.Timestamp(2018,1,31,0)
 tS2=tS2.to_pydatetime()
@@ -160,7 +169,7 @@ Ds2=Ds[IxS]
 
 print('scatter plot')
 plt.subplot(222)
-plt.plot(range(20),range(20),color='black')
+plt.plot(range(25),range(25),color='black')
 plt.scatter(SWEr2,SWEs2,c=Ts2, cmap='jet')
 plt.colorbar()
 plt.plot(range(20),range(20),color='black')
@@ -179,9 +188,9 @@ plt.ylim((0,30))
 
 print('time series of 3 variables')
 plt.subplot(224)
-tS=pd.Timestamp(2017,10,31)
+tS=pd.Timestamp(2017,11,1)
 tS=tS.to_pydatetime()
-tS2=pd.Timestamp(2017,12,31,0)
+tS2=pd.Timestamp(2018,1,31,0)
 tS2=tS2.to_pydatetime()
 #SWEradar=SWEradar[Ix]
 #t2=t2[Ix]
